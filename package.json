@@ -1,0 +1,47 @@
+{
+  "name": "website-fetcher",
+  "version": "1.0.0",
+  "description": "Recursive website content fetcher for AI/LLM analysis - downloads HTML, CSS, images, and extracts structured content",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "website-fetcher": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "fetch": "tsx src/index.ts"
+  },
+  "keywords": [
+    "website",
+    "scraper",
+    "crawler",
+    "fetcher",
+    "ai",
+    "llm",
+    "seo",
+    "content-extraction"
+  ],
+  "author": "Software Moling",
+  "license": "MIT",
+  "dependencies": {
+    "website-scraper": "^6.0.0",
+    "website-scraper-puppeteer": "^2.1.0",
+    "crawlee": "^3.12.1",
+    "cheerio": "^1.0.0",
+    "commander": "^12.1.0",
+    "chalk": "^5.3.0",
+    "ora": "^8.0.1",
+    "fs-extra": "^11.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/fs-extra": "^11.0.4",
+    "typescript": "^5.6.0",
+    "tsx": "^4.19.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
