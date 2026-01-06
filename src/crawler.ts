@@ -5,6 +5,11 @@ import { URL } from 'url';
 import type { FetchOptions, PageContent, SiteContent, AssetInfo, FetchResult } from './types.js';
 import { extractPageContent, generateLlmsTxt, generateMarkdownReport } from './extractor.js';
 
+// Normalize hostname by stripping www. prefix for comparison
+function normalizeHostname(hostname: string): string {
+  return hostname.replace(/^www\./, '');
+}
+
 export async function fetchWebsite(options: FetchOptions): Promise<FetchResult> {
   const {
     url,
@@ -23,6 +28,7 @@ export async function fetchWebsite(options: FetchOptions): Promise<FetchResult> 
   } = options;
 
   const baseUrl = new URL(url);
+  const normalizedBaseHost = normalizeHostname(baseUrl.hostname);
   const assetsDir = path.join(outputDir, 'assets');
   const contentDir = path.join(outputDir, 'content');
 
@@ -37,32 +43,45 @@ export async function fetchWebsite(options: FetchOptions): Promise<FetchResult> 
   const assets: AssetInfo[] = [];
 
   // Build sources config based on options
-  const sources: Array<{ selector: string; attr: string }> = [];
+  // IMPORTANT: Order matters - HTML links first for recursive crawling
+  const sources: Array<{ selector: string; attr: string }> = [
+    // Links FIRST for recursive HTML crawling
+    { selector: 'a[href]', attr: 'href' },
+  ];
 
   if (includeCss) {
-    sources.push({ selector: 'link[rel="stylesheet"]', attr: 'href' });
+    sources.push(
+      { selector: 'link[rel="stylesheet"]', attr: 'href' },
+      { selector: 'style', attr: 'src' }
+    );
   }
   if (includeJs) {
     sources.push({ selector: 'script[src]', attr: 'src' });
   }
   if (includeImages) {
     sources.push(
-      { selector: 'img', attr: 'src' },
-      { selector: 'img', attr: 'srcset' },
-      { selector: 'picture source', attr: 'srcset' }
+      { selector: 'img[src]', attr: 'src' },
+      { selector: 'img[data-src]', attr: 'data-src' },
+      { selector: 'img[srcset]', attr: 'srcset' },
+      { selector: 'picture source[srcset]', attr: 'srcset' },
+      { selector: 'source[src]', attr: 'src' },
+      { selector: '[style*="background"]', attr: 'style' }
     );
   }
   if (includeAssets) {
     sources.push(
       { selector: 'link[rel="icon"]', attr: 'href' },
+      { selector: 'link[rel="shortcut icon"]', attr: 'href' },
       { selector: 'link[rel="apple-touch-icon"]', attr: 'href' },
+      { selector: 'link[rel="manifest"]', attr: 'href' },
       { selector: 'video source', attr: 'src' },
-      { selector: 'audio source', attr: 'src' }
+      { selector: 'video[src]', attr: 'src' },
+      { selector: 'audio source', attr: 'src' },
+      { selector: 'audio[src]', attr: 'src' },
+      { selector: 'object[data]', attr: 'data' },
+      { selector: 'embed[src]', attr: 'src' }
     );
   }
-
-  // Always include links for recursive crawling
-  sources.push({ selector: 'a', attr: 'href' });
 
   console.log(`Starting fetch of ${url}...`);
   console.log(`Output directory: ${outputDir}`);
@@ -89,13 +108,27 @@ export async function fetchWebsite(options: FetchOptions): Promise<FetchResult> 
       ],
       urlFilter: (resourceUrl: string) => {
         try {
-          const resUrl = new URL(resourceUrl);
-          // Only follow links on the same domain
-          return resUrl.hostname === baseUrl.hostname;
+          // Handle relative URLs
+          const resUrl = new URL(resourceUrl, url);
+          // Only follow links on the same domain (normalize to handle www/non-www)
+          const normalizedResHost = normalizeHostname(resUrl.hostname);
+          const isSameDomain = normalizedResHost === normalizedBaseHost;
+          // Skip anchors, mailto, tel, javascript
+          const isValidProtocol = resUrl.protocol === 'http:' || resUrl.protocol === 'https:';
+          // Skip admin/wp-admin paths for WordPress sites
+          const isNotAdmin = !resUrl.pathname.includes('/wp-admin') && !resUrl.pathname.includes('/wp-login');
+
+          return isSameDomain && isValidProtocol && isNotAdmin;
         } catch {
-          return false;
+          // For relative URLs that fail parsing, allow them
+          return !resourceUrl.startsWith('mailto:') &&
+                 !resourceUrl.startsWith('tel:') &&
+                 !resourceUrl.startsWith('javascript:') &&
+                 !resourceUrl.startsWith('#');
         }
-      }
+      },
+      // Generate filenames that preserve URL structure
+      filenameGenerator: 'bySiteStructure'
     });
 
     console.log(`Downloaded ${result.length} resources`);
@@ -224,12 +257,31 @@ async function findAllFiles(dir: string): Promise<string[]> {
 
 function reconstructUrl(baseUrl: string, relativePath: string): string {
   const base = new URL(baseUrl);
+
+  // bySiteStructure creates folders like: hostname/path/index.html
+  // Strip the hostname folder if present
+  let pathWithoutHost = relativePath;
+  const hostVariants = [
+    base.hostname,
+    normalizeHostname(base.hostname),
+    'www.' + normalizeHostname(base.hostname)
+  ];
+  for (const host of hostVariants) {
+    if (relativePath.startsWith(host + '/')) {
+      pathWithoutHost = relativePath.slice(host.length + 1);
+      break;
+    } else if (relativePath.startsWith(host)) {
+      pathWithoutHost = relativePath.slice(host.length);
+      break;
+    }
+  }
+
   // Handle index.html -> /
-  if (relativePath === 'index.html') {
+  if (pathWithoutHost === 'index.html' || pathWithoutHost === '') {
     return base.origin + '/';
   }
   // Remove .html extension for clean URLs
-  const cleanPath = relativePath.replace(/\/index\.html$/, '/').replace(/\.html$/, '');
+  const cleanPath = pathWithoutHost.replace(/\/index\.html$/, '/').replace(/\.html$/, '');
   return base.origin + '/' + cleanPath;
 }
 
