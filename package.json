@@ -27,8 +27,6 @@
   "license": "MIT",
   "dependencies": {
     "website-scraper": "^6.0.0",
-    "website-scraper-puppeteer": "^2.1.0",
-    "crawlee": "^3.12.1",
     "cheerio": "^1.0.0",
     "commander": "^12.1.0",
     "chalk": "^5.3.0",

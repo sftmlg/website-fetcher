@@ -26,10 +26,11 @@ export async function fetchWebsite(options: FetchOptions): Promise<FetchResult> 
   const assetsDir = path.join(outputDir, 'assets');
   const contentDir = path.join(outputDir, 'content');
 
-  // Ensure directories exist
+  // Ensure directories exist (but NOT assets - website-scraper creates that)
   await fs.ensureDir(outputDir);
-  await fs.ensureDir(assetsDir);
   await fs.ensureDir(contentDir);
+  // Remove assets dir if it exists (website-scraper requires fresh directory)
+  await fs.remove(assetsDir);
 
   const errors: string[] = [];
   const pages: PageContent[] = [];
