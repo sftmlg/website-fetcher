@@ -2,6 +2,26 @@
 
 Recursive website content fetcher for AI/LLM analysis. Downloads complete websites including HTML, CSS, JavaScript, images, and extracts structured content for AI consumption.
 
+## Quick Start
+
+**Invocation Pattern**: `pnpm start <command> [args]`
+
+### Common Commands
+```bash
+pnpm start fetch https://example.com                   # Basic fetch
+pnpm start fetch https://example.com -o ./output -d 5  # Custom output & depth
+pnpm start fetch https://example.com --no-assets       # HTML only
+pnpm start analyze ./fetched                           # Analyze fetched content
+```
+
+**Need help?** `pnpm start --help`
+
+---
+
+## Keywords
+
+`website`, `scraper`, `crawler`, `fetch-site`, `download-site`
+
 ## Features
 
 - **Full Website Download**: HTML, CSS, JS, images, fonts - everything
